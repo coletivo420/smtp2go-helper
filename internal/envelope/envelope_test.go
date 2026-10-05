@@ -20,3 +20,20 @@ func TestEnvelope(t *testing.T) {
 		t.Fatalf("sender: %q %v", s, e)
 	}
 }
+
+func TestRecipientRejectsNULAndControls(t *testing.T) {
+	for _, raw := range []string{"a@example.com\x00", "a@example.com\rBcc:x@example.com", "\n"} {
+		if _, err := ParseRecipient(raw); err == nil {
+			t.Fatalf("unsafe recipient accepted: %q", raw)
+		}
+	}
+}
+
+func FuzzParseRecipientNoPanic(f *testing.F) {
+	f.Add("user@example.com")
+	f.Add("a@example.com\r\nBcc:x@example.com")
+	f.Add("\x00")
+	f.Fuzz(func(t *testing.T, value string) {
+		_, _ = ParseRecipient(value)
+	})
+}

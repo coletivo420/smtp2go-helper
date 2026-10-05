@@ -3,6 +3,7 @@ package mimeparser
 
 import (
 	"encoding/base64"
+	"fmt"
 	"strings"
 	"testing"
 )
@@ -146,4 +147,81 @@ func TestNestedMultipartAndCommonAttachmentTypes(t *testing.T) {
 			t.Errorf("attachment %d mismatch: %#v", i, got)
 		}
 	}
+}
+
+func TestMIMEStructuralLimitsAndMalformedEncodings(t *testing.T) {
+	base := func(contentType, body string) []byte {
+		return []byte("From: sender@example.com\r\nSubject: limited\r\nContent-Type: " + contentType + "\r\n\r\n" + body)
+	}
+	tests := []struct {
+		name string
+		raw  []byte
+	}{
+		{"header-line", []byte("From: sender@example.com\r\nSubject: " + strings.Repeat("x", MaxHeaderLine+1) + "\r\n\r\nbody")},
+		{"oversized-message", append([]byte("From: sender@example.com\r\n\r\n"), bytesOf(MaxMIMEBytes+1)...)},
+		{"malformed-base64", base("application/octet-stream\r\nContent-Transfer-Encoding: base64", "%%%bad")},
+		{"malformed-quoted-printable", base("text/plain\r\nContent-Transfer-Encoding: quoted-printable", "bad=GZ")},
+		{"malformed-content-type", base("multipart/mixed; boundary=\"unterminated", "body")},
+		{"unknown-charset", base("text/plain; charset=x-unknown-codex", "body")},
+	}
+	for _, tc := range tests {
+		t.Run(tc.name, func(t *testing.T) {
+			if _, err := Parse(tc.raw, "to@example.com", "", "fallback@example.com"); err == nil {
+				t.Fatal("hostile or malformed MIME accepted")
+			}
+		})
+	}
+}
+
+func TestMIMEPartDepthCountAttachmentAndMetadataLimits(t *testing.T) {
+	deep := "Content-Type: text/plain\r\n\r\nleaf"
+	for i := 0; i < MaxMIMEDepth+2; i++ {
+		boundary := fmt.Sprintf("b%d", i)
+		deep = fmt.Sprintf("Content-Type: multipart/mixed; boundary=%s\r\n\r\n--%s\r\n%s\r\n--%s--\r\n", boundary, boundary, strings.ReplaceAll(deep, "\r\n", "\r\n"), boundary)
+	}
+	if _, err := Parse([]byte("From: a@example.com\r\nSubject: x\r\n"+deep), "to@example.com", "", ""); err == nil {
+		t.Fatal("excessive multipart depth accepted")
+	}
+
+	var many strings.Builder
+	many.WriteString("Content-Type: multipart/mixed; boundary=m\r\n\r\n")
+	for i := 0; i < MaxMIMEParts+1; i++ {
+		many.WriteString("--m\r\nContent-Type: text/plain\r\n\r\nx\r\n")
+	}
+	many.WriteString("--m--\r\n")
+	if _, err := Parse([]byte("From: a@example.com\r\nSubject: x\r\n"+many.String()), "to@example.com", "", ""); err == nil {
+		t.Fatal("excessive multipart count accepted")
+	}
+
+	var attachments strings.Builder
+	attachments.WriteString("Content-Type: multipart/mixed; boundary=a\r\n\r\n")
+	for i := 0; i < MaxAttachmentCount+1; i++ {
+		attachments.WriteString(fmt.Sprintf("--a\r\nContent-Type: application/octet-stream\r\nContent-Disposition: attachment; filename=f%d.bin\r\n\r\nx\r\n", i))
+	}
+	attachments.WriteString("--a--\r\n")
+	if _, err := Parse([]byte("From: a@example.com\r\nSubject: x\r\n"+attachments.String()), "to@example.com", "", ""); err == nil {
+		t.Fatal("excessive attachment count accepted")
+	}
+
+	longName := "Content-Type: application/octet-stream\r\nContent-Disposition: attachment; filename=" + strings.Repeat("f", MaxFilenameBytes+1) + "\r\n\r\nx"
+	if _, err := Parse([]byte("From: a@example.com\r\nSubject: x\r\n"+longName), "to@example.com", "", ""); err == nil {
+		t.Fatal("oversized attachment filename accepted")
+	}
+	longCID := "Content-Type: image/png\r\nContent-ID: <" + strings.Repeat("a", MaxContentIDBytes+1) + ">\r\n\r\nx"
+	if _, err := Parse([]byte("From: a@example.com\r\nSubject: x\r\n"+longCID), "to@example.com", "", ""); err == nil {
+		t.Fatal("oversized Content-ID accepted")
+	}
+}
+
+func bytesOf(n int) []byte { return []byte(strings.Repeat("x", n)) }
+
+func FuzzParseMIMENoPanic(f *testing.F) {
+	f.Add([]byte("From: sender@example.com\r\nSubject: x\r\nContent-Type: text/plain\r\n\r\nhello"))
+	f.Add([]byte("Content-Type: multipart/mixed; boundary=x\r\n\r\n--x--\r\n"))
+	f.Fuzz(func(t *testing.T, raw []byte) {
+		if len(raw) > MaxMIMEBytes+1 {
+			t.Skip()
+		}
+		_, _ = Parse(raw, "to@example.com", "", "fallback@example.com")
+	})
 }

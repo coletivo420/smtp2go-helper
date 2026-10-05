@@ -42,6 +42,10 @@ func run(args []string, stdin io.Reader, stderr io.Writer) int {
 			fmt.Fprintf(stderr, "smtp2go-helper: configuration invalid: %s\n", logsafe.Text(err.Error()))
 			return sysexits.TEMPFAIL
 		}
+		if err = security.CheckProtectedConfig(); err != nil {
+			fmt.Fprintf(stderr, "smtp2go-helper: configuration permissions invalid: %s\n", logsafe.Text(err.Error()))
+			return sysexits.TEMPFAIL
+		}
 		fmt.Fprintln(stderr, "smtp2go-helper: configuration valid")
 		return sysexits.OK
 	}
@@ -56,6 +60,10 @@ func run(args []string, stdin io.Reader, stderr io.Writer) int {
 	cfg, err := config.Load(config.DefaultPath)
 	if err != nil {
 		fmt.Fprintf(stderr, "smtp2go-helper: configuration unavailable: %s\n", logsafe.Text(err.Error()))
+		return sysexits.TEMPFAIL
+	}
+	if err = security.CheckProtectedConfig(); err != nil {
+		fmt.Fprintf(stderr, "smtp2go-helper: configuration permissions invalid: %s\n", logsafe.Text(err.Error()))
 		return sysexits.TEMPFAIL
 	}
 	body, err := io.ReadAll(io.LimitReader(stdin, int64(cfg.MaxMessageBytes)+1))
@@ -176,6 +184,11 @@ func doctor(stderr io.Writer) int {
 	}
 	_ = key
 	fmt.Fprintln(stderr, "API key: configured and readable")
+	if e = security.CheckProtectedConfig(); e != nil {
+		fmt.Fprintf(stderr, "config permissions: ERROR (%s)\n", logsafe.Text(e.Error()))
+		return sysexits.TEMPFAIL
+	}
+	fmt.Fprintln(stderr, "config permissions: root:smtp2go-helper 0640; directory 0750")
 	ss, err := exec.Command("ss", "-lnt").Output()
 	if err != nil {
 		fmt.Fprintln(stderr, "SMTP listener: unable to inspect")
