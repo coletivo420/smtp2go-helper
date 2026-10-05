@@ -109,6 +109,42 @@ func TestMissingSenderAndMalformedMIME(t *testing.T) {
 	}
 }
 
+func TestHeaderSeparatorUsesEarliestSupportedDelimiter(t *testing.T) {
+	t.Run("LF headers with CRLF blank line inside body", func(t *testing.T) {
+		raw := []byte("From: sender@example.com\nSubject: LF message\nContent-Type: text/plain; charset=utf-8\n\nfirst line\r\n\r\nbody delimiter belongs to body")
+		m, err := Parse(raw, "recipient@example.com", "", "")
+		if err != nil {
+			t.Fatal(err)
+		}
+		if m.Subject != "LF message" || m.TextBody != "first line\r\n\r\nbody delimiter belongs to body" {
+			t.Fatalf("wrong separator selected: subject=%q body=%q", m.Subject, m.TextBody)
+		}
+	})
+
+	t.Run("CRLF headers with LF blank line inside body", func(t *testing.T) {
+		raw := []byte("From: sender@example.com\r\nSubject: CRLF message\r\nContent-Type: text/plain; charset=utf-8\r\n\r\nfirst line\n\nbody delimiter belongs to body")
+		m, err := Parse(raw, "recipient@example.com", "", "")
+		if err != nil {
+			t.Fatal(err)
+		}
+		if m.Subject != "CRLF message" || m.TextBody != "first line\n\nbody delimiter belongs to body" {
+			t.Fatalf("wrong separator selected: subject=%q body=%q", m.Subject, m.TextBody)
+		}
+	})
+
+	t.Run("LF only", func(t *testing.T) {
+		m, err := Parse([]byte("From: sender@example.com\nSubject: LF only\n\nbody"), "recipient@example.com", "", "")
+		if err != nil || m.TextBody != "body" {
+			t.Fatalf("LF-only MIME parse failed: body=%q error=%v", m.TextBody, err)
+		}
+	})
+	t.Run("missing delimiter", func(t *testing.T) {
+		if _, err := Parse([]byte("From: sender@example.com\nSubject: no separator"), "recipient@example.com", "", ""); err == nil {
+			t.Fatal("message without header/body separator accepted")
+		}
+	})
+}
+
 func TestNestedMultipartAndCommonAttachmentTypes(t *testing.T) {
 	// Exercise mixed -> alternative nesting and multiple common binary formats.
 	parts := []struct {

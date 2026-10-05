@@ -22,16 +22,30 @@ sub sth_require {
 }
 sub sth_require_post { &error('POST request required') unless ($ENV{'REQUEST_METHOD'}||'') eq 'POST'; }
 sub sth_escape { my ($s)=@_; $s='' unless defined $s; return &html_escape($s); }
-sub sth_sanitize_log {
+sub sth_sanitize_log_fragment {
  my ($s)=@_; $s='' unless defined $s;
  $s =~ s/\x00|[\x01-\x08\x0b\x0c\x0e-\x1f\x7f]/ /g;
  $s =~ s/api-[A-Za-z0-9]{32}/[redacted]/g;
  $s =~ s/(?:authorization|x-smtp2go-api-key|api[_-]?key|token|secret)\s*[:= ]\s*[^\s,;]+/[credential redacted]/ig;
  $s =~ s/[A-Za-z0-9+\/] {80,}={0,2}/[data redacted]/gx;
- $s =~ s/"(?:mime_email|payload|fileblob|attachments?|body|html_body|text_body)"\s*:\s*(?:"(?:\\.|[^"\\])*"|[^,}\s]+)/"sensitive" : "[redacted]"/ig;
- $s =~ s/[\r\n\t]+/ /g;
- $s=substr($s,0,500);
- return $s;
+	$s =~ s/"(?:mime_email|payload|fileblob|attachments?|body|html_body|text_body)"\s*:\s*(?:"(?:\\.|[^"\\])*"|[^,}\s]+)/"sensitive" : "[redacted]"/ig;
+	$s =~ s/[\r\n\t]+/ /g;
+	return $s;
+}
+sub sth_sanitize_status {
+	my ($s)=@_;
+	$s=sth_sanitize_log_fragment($s);
+	return substr($s,0,500);
+}
+sub sth_sanitize_log { return sth_sanitize_status($_[0]); }
+sub sth_recent_log_window {
+	my ($raw,$max_lines,$max_chars)=@_;
+	my @lines=split /\n/,$raw;
+	@lines=@lines[-$max_lines..-1] if @lines>$max_lines;
+	@lines=map { sth_sanitize_log_fragment($_) } @lines;
+	my $out=join("\n",@lines);
+	$out=substr($out,-$max_chars) if length($out)>$max_chars;
+	return $out;
 }
 sub sth_t { my ($key,$fallback)=@_; return defined($text{$key}) ? $text{$key} : $fallback; }
 sub sth_capture {
@@ -55,7 +69,22 @@ sub sth_capture_limited {
  }
  close($fh);
  $data .= "\n[output truncated]" if $total>$limit;
- return ($? >> 8,$data);
+	return ($? >> 8,$data);
+}
+sub sth_capture_tail_limited {
+	my ($limit,@cmd)=@_;
+	my $pid=open(my $fh,'-|',@cmd);
+	return (127,'') unless $pid;
+	binmode($fh);
+	my $tail='';
+	while (1) {
+		my $n=sysread($fh,my $chunk,4096);
+		last unless defined($n) && $n>0;
+		$tail .= $chunk;
+		$tail=substr($tail,-$limit) if length($tail)>$limit;
+	}
+	close($fh);
+	return ($? >> 8,$tail);
 }
 sub sth_read_config {
  my $path=$config{'config_file'} || '/etc/smtp2go-helper/config.json';
@@ -103,17 +132,26 @@ sub sth_key_meta {
  return (0,'') unless $key =~ /^api-[A-Za-z0-9]{32}$/ && $key !~ /\x00/;
  return (1,substr(sha256_hex($key),0,16));
 }
-sub sth_queue {
- my ($status,$out)=sth_capture_limited(262144,'/usr/sbin/postqueue','-p');
- return ('unknown','') if $status;
- my ($active,$hold,$deferred)=(0,0,0);
- for my $line (split /\n/,$out) {
-   next unless $line =~ /^([A-F0-9]{10})([!*]?)\s/;
-   my $marker=$2;
-   $marker eq '!' ? $hold++ : $marker eq '*' ? $active++ : $deferred++;
- }
- return ($active,$hold,$deferred);
+sub sth_count_queue_stream {
+	my ($fh)=@_;
+	my ($active,$hold,$deferred)=(0,0,0);
+	while (my $line=<$fh>) {
+	  next unless $line =~ /^([A-F0-9]{10})([!*]?)\s/;
+	  my $marker=$2;
+	  $marker eq '!' ? $hold++ : $marker eq '*' ? $active++ : $deferred++;
+	}
+	return ($active,$hold,$deferred);
 }
+sub sth_queue_with_command {
+	my (@cmd)=@_;
+	my $pid=open(my $fh,'-|',@cmd);
+	return ('unknown','unknown','unknown') unless $pid;
+	my @counts=sth_count_queue_stream($fh);
+	my $ok=close($fh);
+	return ('unknown','unknown','unknown') unless $ok;
+	return @counts;
+}
+sub sth_queue { return sth_queue_with_command('/usr/sbin/postqueue','-p'); }
 sub sth_postconf {
  my ($name)=@_; my ($rc,$out)=sth_capture('/usr/sbin/postconf','-h',$name);
  return $rc ? '' : $out =~ s/\s+$//r;
@@ -130,7 +168,7 @@ sub sth_status {
  my ($lrc,$logs)=sth_capture_limited(64000,'/usr/bin/journalctl','-u','postfix','-n','100','--no-pager','-o','cat');
  my ($last)=grep { /smtp2go-helper:/ } split /\n/,$logs;
  $last='' unless defined $last;
- $last=sth_sanitize_log($last);
+	$last=sth_sanitize_status($last);
  my ($src,$sockets)=sth_capture('/usr/bin/ss','-lnt');
  my $listener='unknown';
  if (!$src) {

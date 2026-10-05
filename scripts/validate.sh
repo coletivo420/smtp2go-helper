@@ -16,6 +16,7 @@ trap 'unlink "$tmp"' EXIT
 CGO_ENABLED=0 go build -trimpath -o "$tmp" ./cmd/smtp2go-helper
 "$tmp" --version
 bash -n scripts/*.sh
+bash scripts/check-version-consistency.sh
 if command -v perl >/dev/null 2>&1; then
   (cd webmin/smtp2go-helper && for file in *.cgi *.pl; do perl -c "$file"; done)
   perl tests/webmin_security.t
