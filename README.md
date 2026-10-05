@@ -33,6 +33,12 @@ The key belongs in `/etc/smtp2go-helper/api.key` (`root:smtp2go-helper`, `0640`)
 
 ## Operational behavior
 
+Version 0.1.1 adds bounded MIME parsing, strict API-key/config metadata checks,
+restricted HTTP destinations with redirect refusal, bounded API responses,
+POST-only Webmin mutations, race testing, and pinned vulnerability scanning.
+The system install still requires the service account to read only the protected
+key file; see [security design](docs/SECURITY.md).
+
 - `smtp2go-helper --version`
 - `smtp2go-helper config validate`
 - `smtp2go-helper doctor` (read-only; checks Postfix and queries API-key endpoint permissions)
