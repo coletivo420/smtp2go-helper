@@ -1,0 +1,9 @@
+#!/bin/sh
+set -e
+if ! getent group smtp2go-helper >/dev/null; then addgroup --system smtp2go-helper; fi
+if ! getent passwd smtp2go-helper >/dev/null; then adduser --system --ingroup smtp2go-helper --home /nonexistent --no-create-home --shell /usr/sbin/nologin smtp2go-helper; fi
+install -d -o root -g smtp2go-helper -m 0750 /etc/smtp2go-helper
+if [ ! -e /etc/smtp2go-helper/config.json ]; then
+  install -o root -g smtp2go-helper -m 0640 /usr/share/doc/smtp2go-helper/config.json.example /etc/smtp2go-helper/config.json
+fi
+exit 0

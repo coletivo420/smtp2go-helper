@@ -1,0 +1,14 @@
+Source: smtp2go-helper
+Section: mail
+Priority: optional
+Maintainer: coletivo420
+Build-Depends: debhelper-compat (= 13), golang-any
+Standards-Version: 4.7.0
+Rules-Requires-Root: no
+
+Package: smtp2go-helper
+Architecture: any
+Depends: ${shlibs:Depends}, ${misc:Depends}, postfix, ca-certificates
+Description: send-only Postfix pipe transport for SMTP2GO API
+ Local mail is queued by Postfix and submitted using SMTP2GO's JSON API
+ over HTTPS. This package does not configure incoming mail services.

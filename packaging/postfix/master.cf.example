@@ -1,0 +1,2 @@
+smtp2go-helper unix - n n - 1 pipe
+  flags=q user=smtp2go-helper:smtp2go-helper null_sender= argv=/usr/local/libexec/smtp2go-helper ${sender} ${recipient} ${queue_id}

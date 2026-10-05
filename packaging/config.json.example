@@ -1,0 +1,8 @@
+{
+  "endpoint": "https://api.smtp2go.com/v3/email/send",
+  "timeout_seconds": 30,
+  "fastaccept": false,
+  "default_sender": "naoresponda@toca.net.br",
+  "max_message_bytes": 10240000,
+  "log_level": "info"
+}

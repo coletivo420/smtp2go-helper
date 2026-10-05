@@ -1,0 +1,11 @@
+Format: https://www.debian.org/doc/packaging-manuals/copyright-format/1.0/
+Upstream-Name: smtp2go-helper
+Source: https://github.com/coletivo420/smtp2go-helper
+
+Files: *
+Copyright: 2026 coletivo420
+License: GPL-3.0-or-later
+
+Files: debian/*
+Copyright: 2026 coletivo420
+License: GPL-3.0-or-later

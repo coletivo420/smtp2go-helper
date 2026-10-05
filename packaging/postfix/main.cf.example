@@ -1,0 +1,5 @@
+inet_interfaces = loopback-only
+mydestination = localhost
+default_transport = smtp2go-helper:
+smtp2go-helper_destination_recipient_limit = 1
+message_size_limit = 10240000
