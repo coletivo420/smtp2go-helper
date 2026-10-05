@@ -1,0 +1,9 @@
+# SMTP2GO API
+
+This project POSTs JSON to `https://api.smtp2go.com/v3/email/send`, with `X-Smtp2go-Api-Key`, JSON content type, standard CA and hostname verification, configurable timeout (30 seconds by default), and `fastaccept:false` by default. The key is read into memory from `/etc/smtp2go-helper/api.key` for each invocation.
+
+`smtp2go-go` is pinned at commit `8f7031a83e4151f55adecf01b42c55493d4d6803` (pseudo-version recorded in `go.mod`); upstream license is MIT. Its README requires `SMTP2GO_API_KEY`. `core.go` constructs an `http.Client` without a timeout and reads the environment key. `main.go` models `Email`, `EmailBinaryData`, and `EmailCustomHeader`, but `Send` does not retain HTTP status and only examines a narrow error subset, omitting `succeeded`, `failed`, and `failures`. Therefore the adapter reuses upstream request models and marshaling types while handling HTTP and response itself; no fork or copied upstream code is used.
+
+The API docs state that HTTP 200 can include processing errors and callers must inspect `failed` and `failures`; `fastaccept` is a boolean and defaults false. The helper accepts only an unambiguous success response. It treats `failed>0`, nonempty failures, or specific rejection as message error. Unknown or incomplete responses are temporary failures. See [official send endpoint](https://developers.smtp2go.com/reference/send-standard-email).
+
+The upstream model's `EmailBinaryData` fields (`filename`, `fileblob`, `mimetype`) map attachment bytes encoded with standard Base64. Inlines use the same compatible object and `Content-ID` identifier as the filename; HTML `cid:` references are left intact, in accordance with [SMTP2GO's inline guidance](https://developers.smtp2go.com/reference/send-standard-email). The documented overall API message size is 50 MB; this deployment deliberately limits original Postfix messages to 10,240,000 bytes, leaving space for JSON/Base64 expansion.
