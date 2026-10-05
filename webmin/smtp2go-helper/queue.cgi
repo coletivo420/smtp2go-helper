@@ -4,6 +4,7 @@ use warnings;
 require './smtp2go-helper-lib.pl';
 our (%in,%config,%access);
 &sth_init();
+&sth_require('queue_view');
 &sth_require('queue_modify') if $in{'action'};
 my $notice='';
 if ($in{'action'}) {

@@ -18,6 +18,7 @@ sub sth_require {
  &error('Permission denied') unless $access{$right};
 }
 sub sth_escape { my ($s)=@_; $s='' unless defined $s; return &html_escape($s); }
+sub sth_t { my ($key,$fallback)=@_; return defined($text{$key}) ? $text{$key} : $fallback; }
 sub sth_capture {
  my (@cmd)=@_;
  my $pid=open(my $fh, '-|', @cmd);

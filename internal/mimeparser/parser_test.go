@@ -107,3 +107,43 @@ func TestMissingSenderAndMalformedMIME(t *testing.T) {
 		t.Fatal("bad MIME accepted")
 	}
 }
+
+func TestNestedMultipartAndCommonAttachmentTypes(t *testing.T) {
+	// Exercise mixed -> alternative nesting and multiple common binary formats.
+	parts := []struct {
+		name, media, data string
+	}{
+		{"documento.pdf", "application/pdf", "%PDF-test"},
+		{"imagem.png", "image/png", "PNG-test"},
+		{"foto.jpeg", "image/jpeg", "JPEG-test"},
+		{"backup.zip", "application/zip", "ZIP-test"},
+		{"relat%C3%B3rio.txt", "text/plain", "texto"},
+	}
+	var raw strings.Builder
+	raw.WriteString("From: sender@example.com\r\nSubject: nested\r\nMIME-Version: 1.0\r\nContent-Type: multipart/mixed; boundary=outer\r\n\r\n")
+	raw.WriteString("--outer\r\nContent-Type: multipart/alternative; boundary=alt\r\n\r\n")
+	raw.WriteString("--alt\r\nContent-Type: text/plain; charset=utf-8\r\n\r\nplain\r\n--alt\r\nContent-Type: text/html; charset=utf-8\r\n\r\n<b>html</b>\r\n--alt--\r\n")
+	for _, p := range parts {
+		encoded := base64.StdEncoding.EncodeToString([]byte(p.data))
+		raw.WriteString("--outer\r\nContent-Type: " + p.media + "\r\nContent-Disposition: attachment; filename*=utf-8''" + p.name + "\r\nContent-Transfer-Encoding: base64\r\n\r\n" + encoded + "\r\n")
+	}
+	raw.WriteString("--outer--\r\n")
+
+	m, err := Parse([]byte(raw.String()), "only@example.com", "", "")
+	if err != nil {
+		t.Fatal(err)
+	}
+	if m.TextBody != "plain" || m.HTMLBody != "<b>html</b>" {
+		t.Fatalf("nested alternatives not mapped: text=%q html=%q", m.TextBody, m.HTMLBody)
+	}
+	if len(m.Attachments) != len(parts) {
+		t.Fatalf("got %d attachments, want %d", len(m.Attachments), len(parts))
+	}
+	for i, p := range parts {
+		got := m.Attachments[i]
+		wantName := strings.ReplaceAll(p.name, "%C3%B3", "ó")
+		if got.Filename != wantName || got.MIMEType != p.media || string(got.Bytes) != p.data {
+			t.Errorf("attachment %d mismatch: %#v", i, got)
+		}
+	}
+}

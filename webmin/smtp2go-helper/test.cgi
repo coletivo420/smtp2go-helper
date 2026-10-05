@@ -6,6 +6,7 @@ use Symbol qw(gensym);
 require './smtp2go-helper-lib.pl';
 our (%in,%config);
 &sth_init();
+&sth_require('view');
 &sth_require('test') if $in{'send'};
 my $message='';
 my $sent=0;

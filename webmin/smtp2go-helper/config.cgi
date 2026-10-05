@@ -4,6 +4,7 @@ use warnings;
 require './smtp2go-helper-lib.pl';
 our (%in,%config,%access);
 &sth_init();
+&sth_require('view');
 &sth_require('configure') if $in{'save_config'};
 &sth_require('replace_api_key') if $in{'replace_key'};
 my $path=$config{'config_file'}||'/etc/smtp2go-helper/config.json';
