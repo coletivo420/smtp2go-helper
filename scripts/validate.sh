@@ -12,11 +12,16 @@ else
   echo 'race detector skipped: cgo compiler unavailable'
 fi
 tmp=$(mktemp)
-trap 'rm -f "$tmp"' EXIT
+trap 'unlink "$tmp"' EXIT
 CGO_ENABLED=0 go build -trimpath -o "$tmp" ./cmd/smtp2go-helper
 "$tmp" --version
 bash -n scripts/*.sh
 if command -v perl >/dev/null 2>&1; then
   (cd webmin/smtp2go-helper && for file in *.cgi *.pl; do perl -c "$file"; done)
+  perl tests/webmin_security.t
+  for file in config.cgi test.cgi queue.cgi reload.cgi; do
+    grep -Fq "ui_form_start('$file','post')" "webmin/smtp2go-helper/$file"
+    grep -Fq 'sth_require_post();' "webmin/smtp2go-helper/$file"
+  done
 fi
 echo 'validation passed'
