@@ -1,0 +1,28 @@
+From: sender@example.com
+To: first@example.com, second@example.com
+Cc: carbon@example.com
+Bcc: blind@example.com
+Subject: nested fixture
+MIME-Version: 1.0
+Content-Type: multipart/mixed; boundary=outer
+
+--outer
+Content-Type: multipart/alternative; boundary=inner
+
+--inner
+Content-Type: text/plain; charset=UTF-8
+Content-Transfer-Encoding: quoted-printable
+
+Ol=C3=A1
+--inner
+Content-Type: text/html; charset=UTF-8
+
+<b>Olá</b>
+--inner--
+--outer
+Content-Type: application/octet-stream; name="sample.txt"
+Content-Disposition: attachment; filename="sample.txt"
+Content-Transfer-Encoding: base64
+
+Zml4dHVyZQ==
+--outer--
