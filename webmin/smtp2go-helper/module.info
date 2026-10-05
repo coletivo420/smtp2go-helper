@@ -1,0 +1,7 @@
+category=servers
+desc=SMTP2GO Helper
+name=SMTP2GO Helper
+longdesc=Administer the local Postfix to SMTP2GO API send-only transport.
+os_support=*-linux*
+depends=2.670
+version=0.1.0

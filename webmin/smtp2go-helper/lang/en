@@ -1,0 +1,6 @@
+index_title=SMTP2GO Helper
+status_title=Transport status
+config_title=Configuration
+test_title=Send test through Postfix
+queue_title=Postfix queue
+log_title=Recent helper logs

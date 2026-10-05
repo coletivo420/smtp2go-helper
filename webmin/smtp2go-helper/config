@@ -1,0 +1,5 @@
+helper_bin=/usr/local/libexec/smtp2go-helper
+config_file=/etc/smtp2go-helper/config.json
+key_file=/etc/smtp2go-helper/api.key
+postfix_bin=/usr/sbin/postfix
+sendmail_bin=/usr/sbin/sendmail
