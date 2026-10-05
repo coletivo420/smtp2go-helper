@@ -1,0 +1,10 @@
+/build/
+/dist/
+*.deb
+*.key
+api.key
+secrets
+.env
+__pycache__/
+.pytest_cache/
+*.swp

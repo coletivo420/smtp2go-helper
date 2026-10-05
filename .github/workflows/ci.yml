@@ -1,0 +1,26 @@
+name: Go CI
+on:
+  push:
+  pull_request:
+  workflow_dispatch:
+permissions:
+  contents: read
+jobs:
+  test:
+    runs-on: ubuntu-latest
+    strategy:
+      matrix:
+        go: ['1.24.x', '1.25.x', '1.26.x']
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-go@v5
+        with:
+          go-version: ${{ matrix.go }}
+          cache: true
+      - run: go mod tidy
+      - run: test -z "$(git status --porcelain go.mod go.sum)"
+      - run: go test ./...
+      - run: go vet ./...
+      - run: go build ./cmd/smtp2go-helper
+      - run: bash -n scripts/*.sh
+      - run: cd webmin/smtp2go-helper && for f in *.cgi *.pl; do perl -c "$f"; done
