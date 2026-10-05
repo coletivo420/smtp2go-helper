@@ -12,8 +12,10 @@ jobs:
       matrix:
         go: ['1.24.x', '1.25.x', '1.26.x']
     steps:
-      - uses: actions/checkout@v4
-      - uses: actions/setup-go@v5
+      # actions/checkout v4.2.2
+      - uses: actions/checkout@11bd71901bbe5b1630ceea73d27597364c9af683
+      # actions/setup-go v5.5.0
+      - uses: actions/setup-go@d35c59abb061a4a6fb18e82ac0862c26744d6ab5
         with:
           go-version: ${{ matrix.go }}
           cache: true
@@ -24,3 +26,28 @@ jobs:
       - run: go build ./cmd/smtp2go-helper
       - run: bash -n scripts/*.sh
       - run: cd webmin/smtp2go-helper && for f in *.cgi *.pl; do perl -c "$f"; done
+      - run: perl tests/webmin_security.t
+      - run: for f in config.cgi test.cgi queue.cgi reload.cgi; do grep -Fq "ui_form_start('$f','post')" "webmin/smtp2go-helper/$f"; grep -Fq 'sth_require_post();' "webmin/smtp2go-helper/$f"; done
+  race:
+    runs-on: ubuntu-latest
+    steps:
+      # actions/checkout v4.2.2
+      - uses: actions/checkout@11bd71901bbe5b1630ceea73d27597364c9af683
+      # actions/setup-go v5.5.0
+      - uses: actions/setup-go@d35c59abb061a4a6fb18e82ac0862c26744d6ab5
+        with:
+          go-version: '1.26.x'
+          cache: true
+      - run: go test -race ./...
+  vulnerability:
+    runs-on: ubuntu-latest
+    steps:
+      # actions/checkout v4.2.2
+      - uses: actions/checkout@11bd71901bbe5b1630ceea73d27597364c9af683
+      # actions/setup-go v5.5.0
+      - uses: actions/setup-go@d35c59abb061a4a6fb18e82ac0862c26744d6ab5
+        with:
+          go-version: '1.26.x'
+          cache: true
+      - run: go install golang.org/x/vuln/cmd/govulncheck@v1.8.0
+      - run: govulncheck ./...

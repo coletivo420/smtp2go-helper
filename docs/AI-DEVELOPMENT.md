@@ -14,3 +14,9 @@
 - Webmin test submits through `/usr/sbin/sendmail`; queue actions require their own ACL and confirmation.
 - No implementation task may release or delete existing held messages without an explicit request.
 - Update docs and regression tests when changing any item above.
+- Never reintroduce `/email/mime`, SMTP AUTH, or SMTP relay configuration.
+- Never use MIME To/Cc/Bcc for delivery; never raise recipient limit above one without an explicit redesign.
+- Never expose a public SMTP listener, put API keys in argv, or permit an HTTP/arbitrary API endpoint or cross-host redirect with the key.
+- Never convert an ambiguous infrastructure/API result into a bounce; preserve it for retry.
+- Never mutate held messages automatically or remove backups automatically.
+- Keep bounded parsing, bounded HTTP responses, strict secret-file metadata checks, and Webmin POST/ACL/CSRF protections covered by tests.

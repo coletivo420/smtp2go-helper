@@ -2,6 +2,8 @@
 
 The production Python `postfix-smtp2go-api` implementation and `/email/mime` endpoint are deliberately abandoned. The new project starts from Go source and uses the upstream `smtp2go-go` models plus an HTTP adapter to `/email/send`.
 
+For the 0.1.1 cleanup, legacy runtime files and the old account are retired only after active Postfix/Webmin/cron/systemd references, processes, and ownership have been checked. Recognized legacy files are moved into a root-only backup; unknown files stop the cleanup. The two historical held queue IDs remain untouched.
+
 ## Safe sequence
 
 1. Preserve the prior Postfix files, Python helper, protected legacy key path, Webmin state, and queue diagnostics in the root-only backup.

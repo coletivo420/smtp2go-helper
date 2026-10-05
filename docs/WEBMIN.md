@@ -6,4 +6,6 @@ The test page submits a minimal message to /usr/sbin/sendmail; it never calls th
 
 Module ACL fields are view, configure, replace_api_key, test, queue_view, queue_modify, and reload_postfix. Queue modification requires a valid 10-character Postfix queue ID, the queue-modify ACL, and a confirmation checkbox. Message bodies are not shown. The module does not enable mail hosting, IMAP, POP, or external SMTP listeners.
 
+All mutating forms use POST and each handler rechecks its operation-specific ACL server-side. Webmin's native module initialization/referer checks provide CSRF protection. Configuration/key writes use an exclusive temporary file in the target directory and atomic rename; key replacement checks only `/email/send` permission and restores the previous key if the check fails. Logs and queue output are bounded/escaped, and message content is never rendered.
+
 Install/update with scripts/install.sh --webmin. The installer discovers the Webmin root and adds the module to the existing root user's module ACL, then restarts Webmin. No other Webmin users are granted access automatically. Inspect systemctl status webmin afterward. A syntax check alone is not a browser-session check; confirm the module is listed and dashboard opens in an authenticated Webmin session.

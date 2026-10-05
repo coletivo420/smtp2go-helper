@@ -10,10 +10,12 @@ import (
 	"net/mail"
 	"net/url"
 	"os"
+	"syscall"
 	"time"
 )
 
 const DefaultPath = "/etc/smtp2go-helper/config.json"
+const maxConfigBytes = 64 * 1024
 
 type Config struct {
 	Endpoint        string `json:"endpoint"`
@@ -30,9 +32,19 @@ func Defaults() Config {
 func (c Config) Timeout() time.Duration { return time.Duration(c.TimeoutSeconds) * time.Second }
 
 func Load(path string) (Config, error) {
-	b, err := os.ReadFile(path)
+	fd, err := syscall.Open(path, syscall.O_RDONLY|syscall.O_NOFOLLOW|syscall.O_CLOEXEC, 0)
 	if err != nil {
-		return Config{}, fmt.Errorf("read config: %w", err)
+		return Config{}, errors.New("config file unavailable or symlink")
+	}
+	f := os.NewFile(uintptr(fd), path)
+	defer f.Close()
+	var st syscall.Stat_t
+	if err := syscall.Fstat(fd, &st); err != nil || st.Mode&syscall.S_IFMT != syscall.S_IFREG || st.Mode&0137 != 0 || st.Size < 0 || st.Size > maxConfigBytes {
+		return Config{}, errors.New("config file must be a regular, restricted file no larger than 64 KiB")
+	}
+	b, err := io.ReadAll(io.LimitReader(f, maxConfigBytes+1))
+	if err != nil || len(b) > maxConfigBytes {
+		return Config{}, errors.New("config file read failed or exceeded 64 KiB")
 	}
 	var c Config
 	d := json.NewDecoder(bytes.NewReader(b))

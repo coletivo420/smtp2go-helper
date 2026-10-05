@@ -11,6 +11,7 @@ import (
 	"io"
 	"net"
 	"net/http"
+	"net/url"
 	"strings"
 	"time"
 
@@ -34,7 +35,15 @@ type Client struct {
 }
 
 func New(endpoint string, timeout time.Duration, key string, fastAccept bool) *Client {
-	return &Client{endpoint: endpoint, timeout: timeout, key: key, fastAccept: fastAccept, http: &http.Client{Timeout: timeout}}
+	if timeout <= 0 || timeout > 5*time.Minute {
+		timeout = 30 * time.Second
+	}
+	return &Client{endpoint: endpoint, timeout: timeout, key: key, fastAccept: fastAccept, http: &http.Client{
+		Timeout: timeout,
+		// The helper treats every redirect as a retryable response. This avoids
+		// forwarding the credential or message payload to an untrusted origin.
+		CheckRedirect: func(_ *http.Request, _ []*http.Request) error { return http.ErrUseLastResponse },
+	}}
 }
 
 type payload struct {
@@ -127,6 +136,9 @@ func (c *Client) Permissions(ctx context.Context) (struct{ Send string }, error)
 }
 
 func (c *Client) request(ctx context.Context, url string, body []byte) (int, []byte, error) {
+	if !authorizedURL(url) {
+		return 0, nil, &APIError{sysexits.TEMPFAIL, "smtp2go-helper: refused request to an unauthorized API URL"}
+	}
 	req, err := http.NewRequestWithContext(ctx, http.MethodPost, url, bytes.NewReader(body))
 	if err != nil {
 		return 0, nil, errors.New("request construction failed")
@@ -148,6 +160,17 @@ func (c *Client) request(ctx context.Context, url string, body []byte) (int, []b
 		return resp.StatusCode, nil, &APIError{sysexits.TEMPFAIL, "smtp2go-helper: invalid or oversized API response"}
 	}
 	return resp.StatusCode, raw, nil
+}
+
+// authorizedURL constrains every authenticated request, including the
+// permissions diagnostic, to the documented SMTP2GO API origin and paths.
+// This defense remains effective even if a caller bypasses config.Load.
+func authorizedURL(raw string) bool {
+	u, err := url.Parse(raw)
+	if err != nil || u.Scheme != "https" || u.Host != "api.smtp2go.com" || u.User != nil || u.RawQuery != "" || u.Fragment != "" {
+		return false
+	}
+	return u.Path == "/v3/email/send" || u.Path == "/v3/api_keys/permissions"
 }
 
 type apiResponse struct {
@@ -250,10 +273,6 @@ func classifyHTTP(status int, raw []byte) error {
 	}
 	var v apiResponse
 	_ = json.Unmarshal(raw, &v)
-	detail := v.Error
-	if detail == "" {
-		detail = v.Data.Error
-	}
 	code := v.ErrorCode
 	if code == "" {
 		code = v.Data.ErrorCode
@@ -262,10 +281,10 @@ func classifyHTTP(status int, raw []byte) error {
 		return &APIError{sysexits.TEMPFAIL, fmt.Sprintf("smtp2go-helper: HTTP %d API authorization/configuration failure", status)}
 	}
 	if status == 400 && isPermanentMessageFailure(v.ErrorCode+" "+v.Error+" "+string(v.FieldValidationErrors)+" "+string(v.Data.FieldValidationErrors), append(append(v.Failures, v.Data.Failures...), []byte(" ")...)) {
-		return &APIError{sysexits.DATA, "smtp2go-helper: message rejected: " + logsafe.Text(detail)}
+		return &APIError{sysexits.DATA, "smtp2go-helper: message rejected by SMTP2GO (HTTP 400)"}
 	}
 	if status == 400 {
-		return &APIError{sysexits.TEMPFAIL, "smtp2go-helper: HTTP 400 API request rejected: " + logsafe.Text(detail)}
+		return &APIError{sysexits.TEMPFAIL, "smtp2go-helper: HTTP 400 API request rejected; retained for retry"}
 	}
 	return &APIError{sysexits.TEMPFAIL, fmt.Sprintf("smtp2go-helper: HTTP %d API response requires retry", status)}
 }
