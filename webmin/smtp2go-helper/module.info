@@ -4,4 +4,4 @@ name=SMTP2GO Helper
 longdesc=Administer the local Postfix to SMTP2GO API send-only transport.
 os_support=*-linux*
 depends=2.670
-version=0.1.0
+version=0.1.1

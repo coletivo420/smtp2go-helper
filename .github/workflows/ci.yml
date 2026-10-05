@@ -25,6 +25,7 @@ jobs:
       - run: go vet ./...
       - run: go build ./cmd/smtp2go-helper
       - run: bash -n scripts/*.sh
+      - run: bash scripts/check-version-consistency.sh
       - run: cd webmin/smtp2go-helper && for f in *.cgi *.pl; do perl -c "$f"; done
       - run: perl tests/webmin_security.t
       - run: for f in config.cgi test.cgi queue.cgi reload.cgi; do grep -Fq "ui_form_start('$f','post')" "webmin/smtp2go-helper/$f"; grep -Fq 'sth_require_post();' "webmin/smtp2go-helper/$f"; done

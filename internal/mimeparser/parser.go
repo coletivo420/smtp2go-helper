@@ -117,9 +117,20 @@ func Parse(raw []byte, recipient, envelopeSender, defaultSender string) (message
 }
 
 func validateHeaderBlock(raw []byte) error {
-	sep := bytes.Index(raw, []byte("\r\n\r\n"))
-	if sep < 0 {
-		sep = bytes.Index(raw, []byte("\n\n"))
+	crlfIndex := bytes.Index(raw, []byte("\r\n\r\n"))
+	lfIndex := bytes.Index(raw, []byte("\n\n"))
+	sep := -1
+	switch {
+	case crlfIndex >= 0 && lfIndex >= 0:
+		if crlfIndex < lfIndex {
+			sep = crlfIndex
+		} else {
+			sep = lfIndex
+		}
+	case crlfIndex >= 0:
+		sep = crlfIndex
+	case lfIndex >= 0:
+		sep = lfIndex
 	}
 	if sep < 0 {
 		return errors.New("MIME header/body separator is missing")

@@ -1,3 +1,12 @@
+smtp2go-helper (0.1.1-1) unstable; urgency=medium
+
+  * Harden MIME parsing, API transport, secret handling, and Webmin operations.
+  * Bound MIME and HTTP resources; reject unsafe API redirects and file metadata.
+  * Correct sanitized log windows and complete streaming Postfix queue counts.
+  * Add race detection, vulnerability scanning, and operational regression coverage.
+
+ -- coletivo420 <piradopirata@toca.net.br>  Mon, 05 Oct 2026 00:00:00 -0300
+
 smtp2go-helper (0.1.0-1) unstable; urgency=medium
 
   * Initial Go implementation using SMTP2GO /email/send.
